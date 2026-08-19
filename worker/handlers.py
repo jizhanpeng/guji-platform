@@ -12,12 +12,16 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from backend.app.models import CharCrop, Image, Job, Project, Style
+from backend.app.services.charset import rebuild_charset
 from backend.app.services.clustering import (apply_groups_to_db, cluster_matrix_for_images,
                                              cluster_stats, groups_from_labels, labels_at,
                                              linkage_matrix, merge_singletons)
+from backend.app.services.crops import auto_crop_project
 from backend.app.services.features import embed_project
+from backend.app.services.fontdataset_export import export_fontdataset
 from backend.app.services.importer import import_images, scan_folder
 from backend.app.services.m5hisdoc_import import import_m5hisdoc
+from backend.app.services.render import render_content_all
 
 
 class JobContext:
@@ -41,8 +45,10 @@ class JobContext:
         self.job.log = (self.job.log + f"\n[{ts}] {msg}").strip()
 
     def canceled(self) -> bool:
-        self.db.refresh(self.job)
-        return bool(self.job.cancel_requested)
+        # 标量查询而非 db.refresh(job)：refresh 会丢弃 job 上未提交的 log/progress
+        val = (self.db.query(Job.cancel_requested)
+               .filter(Job.id == self.job.id).scalar())
+        return bool(val)
 
 
 def handle_dummy(db: Session, job: Job, ctx: JobContext):
@@ -112,7 +118,7 @@ def _drop_auto_styles(db: Session, project_id: int, ctx: JobContext):
 
 
 def handle_cluster(db: Session, job: Job, ctx: JobContext):
-    """全项目层次聚类 → 风格。默认参数复现 styles_final.json（t=0.25, nocap, merge 0.8）。"""
+    """全项目层次聚类 → 风格。默认参数复现 styles_final.json（t=0.25, nocap, merge 0.5）。"""
     payload = json.loads(job.payload_json)
     pid = payload["project_id"]
     threshold = float(payload.get("threshold", 0.25))
@@ -182,6 +188,50 @@ def handle_subcluster(db: Session, job: Job, ctx: JobContext):
             f"最大 {stats['size_max']}")
 
 
+def handle_auto_crop(db: Session, job: Job, ctx: JobContext):
+    """按 §2.5 规则对 confirmed/edited 标注裁剪 64×64 单字。幂等。"""
+    payload = json.loads(job.payload_json)
+    stats = auto_crop_project(db, payload["project_id"],
+                              image_ids=payload.get("image_ids"),
+                              progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    ctx.log(f"裁剪完成：新裁 {stats['cropped']} / 丢弃 {stats['dropped']} "
+            f"/ 跳过已有 {stats['skipped']}（共 {stats['pages']} 页）")
+
+
+def handle_charset_rebuild(db: Session, job: Job, ctx: JobContext):
+    """聚合裁剪产物构建字表（实例数、中位框尺寸、训练集/留出标记）。"""
+    payload = json.loads(job.payload_json)
+    stats = rebuild_charset(db, payload["project_id"],
+                            min_instances=int(payload.get("min_instances", 20)),
+                            holdout_ratio=float(payload.get("holdout_ratio", 0.05)),
+                            progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    ctx.log(f"字表完成：{stats['chars']} 字，可训练 {stats['trainable']}，"
+            f"留出 {stats['holdout']}（min_instances={stats['min_instances']}）")
+
+
+def handle_render_content(db: Session, job: Job, ctx: JobContext):
+    """为全部可训练字渲染 64×64 ContentImage（SimSun→SimSun-ExtB 回退）。"""
+    payload = json.loads(job.payload_json)
+    stats = render_content_all(db, only_missing=bool(payload.get("only_missing", True)),
+                               progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    ctx.log(f"渲染完成：成功 {stats['rendered']} / 失败 {stats['failed']} "
+            f"/ 跳过 {stats['skipped']}")
+    if stats["failed_chars"]:
+        ctx.log(f"失败字（前 {len(stats['failed_chars'])} 个）："
+                + " ".join(stats["failed_chars"][:50]))
+
+
+def handle_export_fontdataset(db: Session, job: Job, ctx: JobContext):
+    """导出 FontDataset（train / test_unknown_content / test_unknown_style）。"""
+    payload = json.loads(job.payload_json)
+    export = export_fontdataset(db, payload["project_id"],
+                                progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    params = json.loads(export.params_json)
+    ctx.log(f"导出完成 → data/{export.output_path}：TargetImage {params['target_images']} 张 / "
+            f"ContentImage {params['content_images']} 张 "
+            f"（跳过 <2 图风格 {params['skipped_styles_lt2']} 个）")
+
+
 HANDLERS = {
     "dummy": handle_dummy,
     "import_folder": handle_import_folder,
@@ -189,4 +239,8 @@ HANDLERS = {
     "embed": handle_embed,
     "cluster": handle_cluster,
     "subcluster": handle_subcluster,
+    "auto_crop": handle_auto_crop,
+    "charset_rebuild": handle_charset_rebuild,
+    "render_content": handle_render_content,
+    "export_fontdataset": handle_export_fontdataset,
 }

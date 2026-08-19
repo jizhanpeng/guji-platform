@@ -80,6 +80,30 @@ export interface Style {
   splits: Record<string, number>
 }
 
+export interface Crop {
+  id: number
+  image_id: number
+  char_annotation_id: number | null
+  style_id: number | null
+  char: string | null
+  crop_path: string
+  crop_kind: string
+  scale_ratio: number
+  status: string
+  created_at: string
+}
+
+export interface CharsetEntry {
+  char: string
+  instance_count: number
+  renderable: boolean
+  render_font: string | null
+  in_trainset: boolean
+  is_holdout: boolean
+  median_box_px: number | null
+  content_image_path: string | null
+}
+
 export const api = {
   listProjects: () => request<Project[]>('/projects'),
   createProject: (body: { name: string; kind: string; source_path?: string; notes?: string }) =>
@@ -153,5 +177,47 @@ export const api = {
     request<Job>(`/styles/${styleId}/subcluster`, {
       method: 'POST',
       body: JSON.stringify({ threshold, dino_only: dinoOnly }),
+    }),
+  // ---- 方法二：裁剪复查 / 字表 / 数据流水线 ----
+  listCrops: (params: {
+    project_id: number; status?: string; style_id?: number; char?: string
+    page?: number; per?: number
+  }) => {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    if (params.style_id) qs.set('style_id', String(params.style_id))
+    if (params.char) qs.set('char', params.char)
+    qs.set('page', String(params.page ?? 1))
+    qs.set('per', String(params.per ?? 96))
+    return request<{ total: number; page: number; per: number; items: Crop[] }>(
+      `/projects/${params.project_id}/crops?${qs}`)
+  },
+  cropStats: (projectId: number) =>
+    request<Record<string, number>>(`/projects/${projectId}/crops/stats`),
+  cropImageUrl: (id: number) => `${BASE}/crops/${id}/image`,
+  patchCrop: (id: number, status: string) =>
+    request<Crop>(`/crops/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  bulkCropStatus: (ids: number[], status: string) =>
+    request<{ ok: boolean; count: number }>('/crops/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify({ ids, status }),
+    }),
+  listCharset: (projectId: number, page = 1, per = 200) =>
+    request<{ total: number; items: CharsetEntry[] }>(
+      `/projects/${projectId}/charset?page=${page}&per=${per}`),
+  contentImageUrl: (char: string) => `${BASE}/content/${encodeURIComponent(char)}/image`,
+  startAutoCrop: (projectId: number) =>
+    request<Job>('/jobs/auto_crop', { method: 'POST', body: JSON.stringify({ project_id: projectId }) }),
+  startCharset: (projectId: number, minInstances = 20) =>
+    request<Job>('/jobs/charset_rebuild', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, min_instances: minInstances }),
+    }),
+  startRender: () =>
+    request<Job>('/jobs/render_content', { method: 'POST', body: JSON.stringify({ only_missing: true }) }),
+  startFontDatasetExport: (projectId: number) =>
+    request<Job>('/jobs/export_fontdataset', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId }),
     }),
 }

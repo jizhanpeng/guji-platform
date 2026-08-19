@@ -43,9 +43,15 @@ class Settings(BaseSettings):
     def exports_dir(self) -> Path:
         return self.data_dir / "exports"
 
+    @property
+    def content_dir(self) -> Path:
+        """ContentImage（标准字体渲染图）目录。"""
+        return self.data_dir / "content"
+
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.images_dir, self.masks_dir,
-                  self.crops_dir, self.embeddings_dir, self.exports_dir):
+                  self.crops_dir, self.embeddings_dir, self.exports_dir,
+                  self.content_dir):
             d.mkdir(parents=True, exist_ok=True)
 
 
