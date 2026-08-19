@@ -70,6 +70,16 @@ export interface ExportItem {
   created_at: string
 }
 
+export interface Style {
+  id: number
+  name: string
+  method: string
+  notes: string | null
+  locked_split: string | null
+  image_count: number
+  splits: Record<string, number>
+}
+
 export const api = {
   listProjects: () => request<Project[]>('/projects'),
   createProject: (body: { name: string; kind: string; source_path?: string; notes?: string }) =>
@@ -118,5 +128,30 @@ export const api = {
     request<ExportItem>('/exports/m5hisdoc-csv', {
       method: 'POST',
       body: JSON.stringify({ image_ids: imageIds }),
+    }),
+  listStyles: (projectId: number) => request<Style[]>(`/projects/${projectId}/styles`),
+  createStyle: (projectId: number, name: string) =>
+    request<Style>(`/projects/${projectId}/styles`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  patchStyle: (id: number, patch: Partial<{ name: string; notes: string; locked_split: string | null }>) =>
+    request<Style>(`/styles/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  moveImageStyle: (imageId: number, styleId: number | null, force = false) =>
+    request<{ ok: boolean }>(`/images/${imageId}/style`, {
+      method: 'POST',
+      body: JSON.stringify({ style_id: styleId, force }),
+    }),
+  styleSheetUrl: (id: number, per = 16) => `${BASE}/styles/${id}/sheet?per=${per}`,
+  startEmbed: (projectId: number) =>
+    request<Job>('/jobs/embed', { method: 'POST', body: JSON.stringify({ project_id: projectId }) }),
+  startCluster: (params: {
+    project_id: number; threshold?: number; max_cluster_pages?: number
+    merge_radius?: number; dino_only?: boolean; split_policy?: string
+  }) => request<Job>('/jobs/cluster', { method: 'POST', body: JSON.stringify(params) }),
+  startSubcluster: (styleId: number, threshold: number, dinoOnly = true) =>
+    request<Job>(`/styles/${styleId}/subcluster`, {
+      method: 'POST',
+      body: JSON.stringify({ threshold, dino_only: dinoOnly }),
     }),
 }

@@ -9,6 +9,7 @@ const activeKey = computed(() => route.path)
 
 const menuOptions: MenuOption[] = [
   { label: () => h(RouterLink, { to: '/images' }, { default: () => '图像管理' }), key: '/images' },
+  { label: () => h(RouterLink, { to: '/styles' }, { default: () => '风格管理' }), key: '/styles' },
   { label: () => h(RouterLink, { to: '/jobs' }, { default: () => '任务中心' }), key: '/jobs' },
 ]
 </script>
