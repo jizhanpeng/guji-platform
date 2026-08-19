@@ -53,9 +53,8 @@ def _style_out(db: Session, style: Style) -> StyleOut:
 def list_styles(project_id: int, db: Session = Depends(get_db)):
     if not db.get(Project, project_id):
         raise HTTPException(404, "项目不存在")
-    style_ids = {r.style_id for r in db.query(Image).filter_by(project_id=project_id).all()
-                 if r.style_id is not None}
-    styles = [db.get(Style, sid) for sid in sorted(style_ids)]
+    styles = (db.query(Style).filter_by(project_id=project_id)
+              .order_by(Style.name).all())
     return [_style_out(db, s) for s in styles]
 
 
@@ -66,10 +65,10 @@ def create_style(project_id: int, body: StylePatch, db: Session = Depends(get_db
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "风格名不能为空")
-    if db.query(Style).filter_by(name=name).first():
+    if db.query(Style).filter_by(project_id=project_id, name=name).first():
         raise HTTPException(409, f"风格名 {name} 已存在")
     style = Style(name=name, method="manual", notes=body.notes,
-                  locked_split=body.locked_split)
+                  locked_split=body.locked_split, project_id=project_id)
     db.add(style)
     db.commit()
     db.refresh(style)
@@ -83,7 +82,8 @@ def patch_style(style_id: int, body: StylePatch, db: Session = Depends(get_db)):
         raise HTTPException(404, "风格不存在")
     data = body.model_dump(exclude_unset=True)
     if "name" in data:
-        clash = db.query(Style).filter_by(name=data["name"]).first()
+        clash = db.query(Style).filter_by(project_id=style.project_id,
+                                          name=data["name"]).first()
         if clash and clash.id != style_id:
             raise HTTPException(409, f"风格名 {data['name']} 已存在")
     if "locked_split" in data and data["locked_split"]:
@@ -170,7 +170,7 @@ class ClusterIn(BaseModel):
     project_id: int
     threshold: float = 0.25
     max_cluster_pages: int = 0     # 0 = 不解散大簇（复现 t025_nocap）
-    merge_radius: float = 0.8      # 单页归并半径；<=0 关闭
+    merge_radius: float = 0.5      # 单页归并半径（0.5 复现 styles_final.json 358 风格）；<=0 关闭
     dino_only: bool = False
     split_policy: str = "guard"    # guard | keep
     name_prefix: str = "book"

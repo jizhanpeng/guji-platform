@@ -24,7 +24,7 @@ const current = computed(() => styles.value.find(s => s.id === currentId.value) 
 // 聚类参数弹窗
 const showCluster = ref(false)
 const clusterForm = ref({
-  threshold: 0.25, merge_radius: 0.8, max_cluster_pages: 0,
+  threshold: 0.25, merge_radius: 0.5, max_cluster_pages: 0,
   dino_only: false, split_policy: 'guard',
 })
 // 细分弹窗

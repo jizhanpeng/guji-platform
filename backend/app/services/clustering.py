@@ -147,7 +147,7 @@ def apply_groups_to_db(db: Session, project_id: int, groups: list[list[int]],
     styles = []
     n_warn = 0
     for i, g in enumerate(groups):
-        style = Style(name=f"{name_prefix}_{i:04d}", method=method)
+        style = Style(name=f"{name_prefix}_{i:04d}", method=method, project_id=project_id)
         db.add(style)
         db.flush()
         splits = {rows[k].official_split for k in g if rows[k].official_split}

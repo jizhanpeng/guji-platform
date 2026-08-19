@@ -91,24 +91,19 @@ def handle_embed(db: Session, job: Job, ctx: JobContext):
 
 def _drop_auto_styles(db: Session, project_id: int, ctx: JobContext):
     """重聚类前清理：摘下项目图像的旧自动风格并删除空壳 Style。"""
-    img_ids = [r.id for r in db.query(Image).filter_by(project_id=project_id).all()]
-    old_ids = {r.style_id for r in db.query(Image).filter(Image.id.in_(img_ids)).all()
-               if r.style_id is not None}
-    if not old_ids:
-        return
+    img_ids = {r.id for r in db.query(Image).filter_by(project_id=project_id).all()}
+    old_styles = (db.query(Style).filter_by(project_id=project_id)
+                  .filter(Style.method != "manual").all())
     dropped = 0
-    for sid in old_ids:
-        style = db.get(Style, sid)
-        if style is None or style.method == "manual":
-            continue  # 手工风格不拆
-        if db.query(CharCrop).filter_by(style_id=sid).first():
+    for style in old_styles:
+        if db.query(CharCrop).filter_by(style_id=style.id).first():
             ctx.log(f"风格 {style.name} 已有裁剪产物，跳过清理")
             continue
-        for img in db.query(Image).filter_by(style_id=sid).all():
+        for img in db.query(Image).filter_by(style_id=style.id).all():
             if img.id in img_ids:
                 img.style_id = None
         db.flush()
-        if not db.query(Image).filter_by(style_id=sid).first():
+        if not db.query(Image).filter_by(style_id=style.id).first():
             db.delete(style)
             dropped += 1
     db.commit()
@@ -122,7 +117,7 @@ def handle_cluster(db: Session, job: Job, ctx: JobContext):
     pid = payload["project_id"]
     threshold = float(payload.get("threshold", 0.25))
     max_pages = int(payload.get("max_cluster_pages", 0))
-    merge_radius = payload.get("merge_radius", 0.8)
+    merge_radius = payload.get("merge_radius", 0.5)
     dino_only = bool(payload.get("dino_only", False))
     split_policy = payload.get("split_policy", "guard")
     prefix = payload.get("name_prefix", "book")

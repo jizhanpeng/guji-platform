@@ -90,7 +90,13 @@ def import_m5hisdoc(db: Session, project: Project, root: Path, subset: str,
 
         label_file = labels_dir / f"{src.stem}.txt"
         if label_file.exists():
+            # 官方 label_char 偶有完全重复的行（同框同字），按页去重以满足
+            # (image_id, origin, box) 唯一约束（OCR 幂等约束，对真值同样生效）
+            seen: set[tuple[int, int, int, int]] = set()
             for x1, y1, x2, y2, char in parse_label_char(label_file):
+                if (x1, y1, x2, y2) in seen:
+                    continue
+                seen.add((x1, y1, x2, y2))
                 db.add(CharAnnotation(
                     image_id=img.id, x1=x1, y1=y1, x2=x2, y2=y2,
                     char=char or None, origin="m5hisdoc", status="confirmed"))

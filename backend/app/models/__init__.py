@@ -23,9 +23,15 @@ class Project(Base):
 
 class Style(Base):
     __tablename__ = "styles"
+    __table_args__ = (
+        # 风格名项目内唯一（不同项目可各自有 book_0000）
+        UniqueConstraint("project_id", "name", name="uq_style_project_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), unique=True)  # book_0001 等
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))  # book_0001 等
     method: Mapped[str] = mapped_column(String(20), default="manual")  # STYLE_METHODS
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 簇级划分锁：防泄漏闸。非空时该风格只能含对应 split 的页面
