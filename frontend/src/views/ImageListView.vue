@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NButton, NCard, NEmpty, NForm, NFormItem, NGrid, NGi, NInput, NModal,
   NPagination, NSelect, NSpace, NTag, useMessage,
 } from 'naive-ui'
 import { api, type ImageItem, type Project } from '../api'
 
+const router = useRouter()
 const message = useMessage()
 
 const projects = ref<Project[]>([])
@@ -112,7 +114,8 @@ onMounted(async () => {
 
     <n-grid :cols="6" :x-gap="12" :y-gap="12">
       <n-gi v-for="img in images" :key="img.id">
-        <n-card size="small" :title="img.filename" :header-style="{ fontSize: '12px' }">
+        <n-card size="small" :title="img.filename" :header-style="{ fontSize: '12px' }"
+          style="cursor: pointer" @click="router.push(`/annotate/${img.id}`)">
           <template #cover>
             <img :src="api.imageFileUrl(img.id, 'thumb')" style="width: 100%; height: 160px; object-fit: contain; background: #f5f5f5" />
           </template>

@@ -52,6 +52,11 @@ class ImportFolderIn(BaseModel):
     source: str = "scan"
 
 
+class ImportM5HisDocIn(BaseModel):
+    root: str   # 包含 split_train.txt 等的根目录
+    subset: str = "M5HisDoc_regular"  # 或 M5HisDoc_hard
+
+
 # ---- 任务 ----
 class JobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

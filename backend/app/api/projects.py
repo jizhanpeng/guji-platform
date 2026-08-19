@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Image, Project
-from ..schemas import (ImageListOut, ImageOut, ImportFolderIn, JobOut,
-                       ProjectCreate, ProjectOut)
+from ..schemas import (ImageListOut, ImageOut, ImportFolderIn, ImportM5HisDocIn,
+                       JobOut, ProjectCreate, ProjectOut)
 from ..services import queue
 from ..services.imaging import variant_path
 from fastapi.responses import FileResponse
@@ -47,6 +47,19 @@ def import_folder(project_id: int, body: ImportFolderIn, db: Session = Depends(g
     return queue.enqueue(db, "import_folder",
                          {"project_id": project_id, "folder": body.folder,
                           "source": body.source})
+
+
+@router.post("/projects/{project_id}/import-m5hisdoc", response_model=JobOut)
+def import_m5hisdoc(project_id: int, body: ImportM5HisDocIn,
+                    db: Session = Depends(get_db)):
+    if not db.get(Project, project_id):
+        raise HTTPException(404, "项目不存在")
+    from pathlib import Path
+    if not Path(body.root).is_dir():
+        raise HTTPException(400, f"目录不存在: {body.root}")
+    return queue.enqueue(db, "import_m5hisdoc",
+                         {"project_id": project_id, "root": body.root,
+                          "subset": body.subset})
 
 
 # ---- 图像 ----

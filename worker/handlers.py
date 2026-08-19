@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import Job, Project
 from backend.app.services.importer import import_images, scan_folder
+from backend.app.services.m5hisdoc_import import import_m5hisdoc
 
 
 class JobContext:
@@ -63,7 +64,20 @@ def handle_import_folder(db: Session, job: Job, ctx: JobContext):
     ctx.log(f"导入完成，共 {n} 张")
 
 
+def handle_import_m5hisdoc(db: Session, job: Job, ctx: JobContext):
+    payload = json.loads(job.payload_json)
+    project = db.get(Project, payload["project_id"])
+    if project is None:
+        raise RuntimeError(f"项目不存在: {payload['project_id']}")
+    stats = import_m5hisdoc(db, project, Path(payload["root"]),
+                            payload.get("subset", "M5HisDoc_regular"),
+                            progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    ctx.log(f"导入完成：{stats['images']} 页 / {stats['annotations']} 条标注"
+            f"（跳过 {stats['skipped']}）")
+
+
 HANDLERS = {
     "dummy": handle_dummy,
     "import_folder": handle_import_folder,
+    "import_m5hisdoc": handle_import_m5hisdoc,
 }

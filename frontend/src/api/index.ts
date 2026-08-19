@@ -48,6 +48,28 @@ export interface Job {
   finished_at: string | null
 }
 
+export interface Annotation {
+  id: number
+  image_id: number
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  char: string | null
+  origin: string
+  confidence: number | null
+  status: string
+}
+
+export interface ExportItem {
+  id: number
+  kind: string
+  params_json: string
+  output_path: string | null
+  status: string
+  created_at: string
+}
+
 export const api = {
   listProjects: () => request<Project[]>('/projects'),
   createProject: (body: { name: string; kind: string; source_path?: string; notes?: string }) =>
@@ -67,7 +89,34 @@ export const api = {
   },
   imageFileUrl: (id: number, variant: 'thumb' | 'display' | 'original' = 'thumb') =>
     `${BASE}/images/${id}/file?variant=${variant}`,
+  getImage: (id: number) => request<ImageItem>(`/images/${id}`),
   listJobs: (limit = 50) => request<Job[]>(`/jobs?limit=${limit}`),
   cancelJob: (id: number) => request<{ ok: boolean }>(`/jobs/${id}/cancel`, { method: 'POST' }),
   dummyJob: () => request<Job>('/jobs/dummy', { method: 'POST' }),
+  importM5HisDoc: (projectId: number, root: string, subset: string) =>
+    request<Job>(`/projects/${projectId}/import-m5hisdoc`, {
+      method: 'POST',
+      body: JSON.stringify({ root, subset }),
+    }),
+  listAnnotations: (imageId: number) => request<Annotation[]>(`/images/${imageId}/char-annotations`),
+  createAnnotation: (imageId: number, box: { x1: number; y1: number; x2: number; y2: number; char?: string }) =>
+    request<Annotation>(`/images/${imageId}/char-annotations`, {
+      method: 'POST',
+      body: JSON.stringify(box),
+    }),
+  patchAnnotation: (id: number, patch: Partial<{ x1: number; y1: number; x2: number; y2: number; char: string; status: string }>) =>
+    request<Annotation>(`/char-annotations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteAnnotation: (id: number) =>
+    request<{ ok: boolean }>(`/char-annotations/${id}`, { method: 'DELETE' }),
+  bulkStatus: (ids: number[], status: string) =>
+    request<{ ok: boolean; count: number }>('/char-annotations/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify({ ids, status }),
+    }),
+  listExports: () => request<ExportItem[]>('/exports'),
+  exportCsv: (imageIds: number[]) =>
+    request<ExportItem>('/exports/m5hisdoc-csv', {
+      method: 'POST',
+      body: JSON.stringify({ image_ids: imageIds }),
+    }),
 }
