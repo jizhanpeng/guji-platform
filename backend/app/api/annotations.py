@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import CharAnnotation, Image
+from ..schemas import JobOut
 from ..services.page_status import recompute_page_status
+from ..services.queue import enqueue
 
 router = APIRouter(prefix="/api", tags=["annotations"])
 
@@ -121,3 +123,15 @@ def bulk_status(body: BulkStatusIn, db: Session = Depends(get_db)):
         recompute_page_status(db, iid)
     db.commit()
     return {"ok": True, "count": len(annos)}
+
+
+# ---- OCR 自动标注任务 ----
+
+class OcrIn(BaseModel):
+    project_id: int
+    image_ids: list[int] | None = None  # None = 全项目
+
+
+@router.post("/jobs/ocr", response_model=JobOut)
+def start_ocr(body: OcrIn, db: Session = Depends(get_db)):
+    return enqueue(db, "ocr", body.model_dump())

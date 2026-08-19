@@ -107,6 +107,12 @@ async function confirmAll() {
   message.success(`已确认 ${r.count} 条`)
 }
 
+async function runOcr() {
+  if (!image.value) return
+  await api.startOcr(image.value.project_id, [imageId.value])
+  message.success('OCR 任务已提交（约 40 秒/页，完成后刷新本页）')
+}
+
 const STATUS_TYPE: Record<string, 'warning' | 'success' | 'info'> = {
   auto: 'warning', confirmed: 'success', edited: 'info',
 }
@@ -153,6 +159,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </label>
       <NButton size="small" @click="go(-1)">← 上一页</NButton>
       <NButton size="small" @click="go(1)">下一页 →</NButton>
+      <NButton size="small" @click="runOcr">OCR 本页</NButton>
+      <NButton size="small" @click="router.push(`/damage/${imageId}`)">破损标注 →</NButton>
       <NButton size="small" type="primary" @click="confirmAll">整页确认</NButton>
     </div>
     <div class="body">

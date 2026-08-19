@@ -17,10 +17,12 @@ from backend.app.services.clustering import (apply_groups_to_db, cluster_matrix_
                                              cluster_stats, groups_from_labels, labels_at,
                                              linkage_matrix, merge_singletons)
 from backend.app.services.crops import auto_crop_project
+from backend.app.services.degrade import export_hdr28k
 from backend.app.services.features import embed_project
 from backend.app.services.fontdataset_export import export_fontdataset
 from backend.app.services.importer import import_images, scan_folder
 from backend.app.services.m5hisdoc_import import import_m5hisdoc
+from backend.app.services.ocr import ocr_project
 from backend.app.services.render import render_content_all
 
 
@@ -232,6 +234,28 @@ def handle_export_fontdataset(db: Session, job: Job, ctx: JobContext):
             f"（跳过 <2 图风格 {params['skipped_styles_lt2']} 个）")
 
 
+def handle_ocr(db: Session, job: Job, ctx: JobContext):
+    """PaddleOCR 行检测 + 行内等分单字框 → CharAnnotation(origin='ocr')。"""
+    payload = json.loads(job.payload_json)
+    stats = ocr_project(db, payload["project_id"],
+                        image_ids=payload.get("image_ids"),
+                        progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    ctx.log(f"OCR 完成：{stats['pages']} 页 / {stats['lines']} 行 / "
+            f"新增 {stats['chars']} 字（跳过已有 {stats['skipped']}）")
+
+
+def handle_export_hdr28k(db: Session, job: Job, ctx: JobContext):
+    """HDR28K 风格导出：512×512 GT/degraded/mask/content + meta.jsonl。"""
+    payload = json.loads(job.payload_json)
+    export = export_hdr28k(db, payload["project_id"],
+                           patches_per_page=int(payload.get("patches_per_page", 4)),
+                           seed=int(payload.get("seed", 42)),
+                           progress_cb=ctx.progress, cancel_cb=ctx.canceled)
+    params = json.loads(export.params_json)
+    ctx.log(f"导出完成 → data/{export.output_path}：{params['patches']}"
+            f"（跳过小页 {params['skipped_small_pages']}）")
+
+
 HANDLERS = {
     "dummy": handle_dummy,
     "import_folder": handle_import_folder,
@@ -243,4 +267,6 @@ HANDLERS = {
     "charset_rebuild": handle_charset_rebuild,
     "render_content": handle_render_content,
     "export_fontdataset": handle_export_fontdataset,
+    "ocr": handle_ocr,
+    "export_hdr28k": handle_export_hdr28k,
 }

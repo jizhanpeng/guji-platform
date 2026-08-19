@@ -104,6 +104,23 @@ export interface CharsetEntry {
   content_image_path: string | null
 }
 
+export interface Stroke {
+  points: number[][]
+  radius: number
+  erase?: boolean
+}
+
+export interface DamageRegion {
+  id: number
+  image_id: number
+  damage_type: string
+  strokes_json: string | null
+  mask_path: string | null
+  origin: string
+  status: string
+  created_at: string
+}
+
 export const api = {
   listProjects: () => request<Project[]>('/projects'),
   createProject: (body: { name: string; kind: string; source_path?: string; notes?: string }) =>
@@ -219,5 +236,21 @@ export const api = {
     request<Job>('/jobs/export_fontdataset', {
       method: 'POST',
       body: JSON.stringify({ project_id: projectId }),
+    }),
+  // ---- 方法一：破损区域 ----
+  listDamage: (imageId: number) => request<DamageRegion[]>(`/images/${imageId}/damage-regions`),
+  createDamage: (imageId: number, body: { damage_type: string; strokes: Stroke[] }) =>
+    request<DamageRegion>(`/images/${imageId}/damage-regions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchDamage: (id: number, patch: Partial<{ damage_type: string; strokes: Stroke[]; status: string }>) =>
+    request<DamageRegion>(`/damage-regions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteDamage: (id: number) =>
+    request<{ ok: boolean }>(`/damage-regions/${id}`, { method: 'DELETE' }),
+  startOcr: (projectId: number, imageIds?: number[]) =>
+    request<Job>('/jobs/ocr', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, image_ids: imageIds ?? null }),
     }),
 }
