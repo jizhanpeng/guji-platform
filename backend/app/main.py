@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import annotations, crops, damage, exports, jobs, projects, styles
+from .api import annotations, crops, damage, exports, jobs, projects, stats, styles
 from .db import init_db
 
 
@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(styles.router)
     app.include_router(crops.router)
     app.include_router(damage.router)
+    app.include_router(stats.router)
 
     @app.on_event("startup")
     def _startup():

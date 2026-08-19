@@ -8,6 +8,7 @@ const route = useRoute()
 const activeKey = computed(() => route.path)
 
 const menuOptions: MenuOption[] = [
+  { label: () => h(RouterLink, { to: '/dashboard' }, { default: () => '总览' }), key: '/dashboard' },
   { label: () => h(RouterLink, { to: '/images' }, { default: () => '图像管理' }), key: '/images' },
   { label: () => h(RouterLink, { to: '/styles' }, { default: () => '风格管理' }), key: '/styles' },
   { label: () => h(RouterLink, { to: '/crops' }, { default: () => '裁剪复查' }), key: '/crops' },

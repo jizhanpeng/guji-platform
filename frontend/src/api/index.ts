@@ -253,4 +253,33 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ project_id: projectId, image_ids: imageIds ?? null }),
     }),
+  // ---- 仪表盘 / 备份 ----
+  getStats: () => request<Stats>('/stats'),
+  backup: () => request<{ ok: boolean; path: string; size_mb: number }>('/backup', { method: 'POST' }),
+  startHdr28kExport: (projectId: number, patchesPerPage = 4) =>
+    request<Job>('/exports/hdr28k', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, patches_per_page: patchesPerPage }),
+    }),
+}
+
+export interface Stats {
+  projects: Array<{
+    id: number
+    name: string
+    kind: string
+    images: Record<string, number>
+    splits: Record<string, number>
+    annotations: Record<string, number>
+    annotation_origins: Record<string, number>
+    crops: Record<string, number>
+    styles: number
+    damage_regions: number
+  }>
+  recent_jobs: Array<{
+    id: number; job_type: string; status: string; progress: number; created_at: string
+  }>
+  recent_exports: Array<{
+    id: number; kind: string; status: string; output_path: string | null; created_at: string
+  }>
 }
